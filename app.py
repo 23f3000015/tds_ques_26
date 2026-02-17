@@ -4,6 +4,7 @@ import time
 import numpy as np
 from collections import OrderedDict
 from datetime import datetime, timedelta
+import os
 
 app = Flask(__name__)
 
@@ -42,7 +43,6 @@ def generate_hash(query):
 
 
 def generate_embedding(text):
-    # Fake embedding using random vector (for assignment demo)
     np.random.seed(abs(hash(text)) % (10 ** 8))
     return np.random.rand(128)
 
@@ -66,15 +66,21 @@ def remove_expired_entries():
 
 
 def call_llm(query):
-    # Simulated LLM response
     time.sleep(1)
     return f"Answer for: {query}"
 
 
 # -------------------------
-# MAIN ENDPOINT
+# HOME ROUTE (Prevents 405)
 # -------------------------
+@app.route("/", methods=["GET"])
+def home():
+    return "FAQ Cache API is running."
 
+
+# -------------------------
+# MAIN POST ENDPOINT
+# -------------------------
 @app.route("/", methods=["POST"])
 def handle_query():
     global total_requests, cache_hits, cache_misses
@@ -117,11 +123,10 @@ def handle_query():
                 "cacheKey": key
             })
 
-    # 3️⃣ Cache Miss → Call LLM
+    # 3️⃣ Cache Miss
     cache_misses += 1
     answer = call_llm(query)
 
-    # Store in cache
     if len(cache) >= CACHE_SIZE:
         oldest = next(iter(cache))
         cache.pop(oldest)
@@ -146,7 +151,6 @@ def handle_query():
 # -------------------------
 # ANALYTICS ENDPOINT
 # -------------------------
-
 @app.route("/analytics", methods=["GET"])
 def analytics():
     hit_rate = (cache_hits / total_requests) if total_requests > 0 else 0
@@ -174,5 +178,9 @@ def analytics():
     })
 
 
+# -------------------------
+# RENDER PORT FIX
+# -------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
