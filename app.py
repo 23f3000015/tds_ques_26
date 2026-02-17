@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import hashlib
 import time
 import numpy as np
@@ -7,6 +8,7 @@ from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
+CORS(app)  # IMPORTANT for IITM auto-checker
 
 # -------------------------
 # CONFIGURATION
@@ -17,13 +19,13 @@ MODEL_COST_PER_MILLION = 0.50
 AVG_TOKENS = 500
 
 # -------------------------
-# IN-MEMORY CACHE (LRU)
+# CACHE STORAGE
 # -------------------------
 cache = OrderedDict()
 embeddings_store = {}
 
 # -------------------------
-# ANALYTICS
+# ANALYTICS COUNTERS
 # -------------------------
 total_requests = 0
 cache_hits = 0
@@ -71,11 +73,11 @@ def call_llm(query):
 
 
 # -------------------------
-# HOME ROUTE (Prevents 405)
+# ROOT GET (Prevents 405)
 # -------------------------
 @app.route("/", methods=["GET"])
 def home():
-    return "FAQ Cache API is running."
+    return jsonify({"message": "FAQ Cache API running"})
 
 
 # -------------------------
@@ -88,11 +90,14 @@ def handle_query():
     start_time = time.time()
     total_requests += 1
 
-    data = request.get_json()
+    # SAFE JSON handling
+    data = request.get_json(silent=True) or {}
     query = normalize_query(data.get("query", ""))
 
-    remove_expired_entries()
+    if not query:
+        return jsonify({"error": "Query is required"}), 400
 
+    remove_expired_entries()
     cache_key = generate_hash(query)
 
     # 1️⃣ Exact Match
