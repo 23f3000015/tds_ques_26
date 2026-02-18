@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
-CORS(app)  # IMPORTANT for IITM auto-checker
+CORS(app)
 
 # -------------------------
 # CONFIGURATION
@@ -58,17 +58,17 @@ def cosine_similarity(vec1, vec2):
 def remove_expired_entries():
     now = datetime.now()
     keys_to_delete = []
-    for key, value in cache.items():
+    for key, value in list(cache.items()):
         if now - value["timestamp"] > timedelta(hours=TTL_HOURS):
             keys_to_delete.append(key)
 
     for key in keys_to_delete:
-        cache.pop(key)
+        cache.pop(key, None)
         embeddings_store.pop(key, None)
 
 
 def call_llm(query):
-    time.sleep(1)
+    time.sleep(1)  # simulate API delay
     return f"Answer for: {query}"
 
 
@@ -90,7 +90,6 @@ def handle_query():
     start_time = time.time()
     total_requests += 1
 
-    # SAFE JSON handling
     data = request.get_json(silent=True) or {}
     query = normalize_query(data.get("query", ""))
 
@@ -104,7 +103,7 @@ def handle_query():
     if cache_key in cache:
         cache_hits += 1
         cache.move_to_end(cache_key)
-        latency = int((time.time() - start_time) * 1000)
+        latency = max(1, int((time.time() - start_time) * 1000))
         return jsonify({
             "answer": cache[cache_key]["answer"],
             "cached": True,
@@ -120,7 +119,7 @@ def handle_query():
         if similarity > 0.95:
             cache_hits += 1
             cache.move_to_end(key)
-            latency = int((time.time() - start_time) * 1000)
+            latency = max(1, int((time.time() - start_time) * 1000))
             return jsonify({
                 "answer": cache[key]["answer"],
                 "cached": True,
@@ -134,7 +133,7 @@ def handle_query():
 
     if len(cache) >= CACHE_SIZE:
         oldest = next(iter(cache))
-        cache.pop(oldest)
+        cache.pop(oldest, None)
         embeddings_store.pop(oldest, None)
 
     cache[cache_key] = {
@@ -143,7 +142,7 @@ def handle_query():
     }
     embeddings_store[cache_key] = query_embedding
 
-    latency = int((time.time() - start_time) * 1000)
+    latency = max(1, int((time.time() - start_time) * 1000))
 
     return jsonify({
         "answer": answer,
